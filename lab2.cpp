@@ -9,22 +9,25 @@ using namespace std;
 class Public_key {
     public:
         __int128 e;
-        __int128 p;
-        __int128 q;
-        Public_key(__int128 e, __int128 p, __int128 q) {
+        __int128 n;
+        Public_key(__int128 e, __int128 n) {
             this->e = e;
-            this->p = p;
-            this->q = q;
+            this->n = n;
         }
 };
 
 class RSAMessage {
 public:
     vector <__int128> m;
+    __int128 sign;
     Public_key public_key;
-    RSAMessage(vector <__int128> m, Public_key key): public_key(key) {
+    Public_key public_sign_key;
+    RSAMessage(vector <__int128> m, __int128 sign, Public_key key, Public_key sign_key): public_key(key),
+                                                                                         public_sign_key(sign_key) {
         this->m = m;
+        this->sign = sign;
         this->public_key = key;
+        this->public_sign_key = sign_key;
     }
 };
 
@@ -110,41 +113,62 @@ string getDecodedMessage(vector <__int128> encodedMessage) {
     return message;
 }
 
-RSAMessage EncryptMessage(string message) {
+uint64_t polynomial_rolling_hash(const std::string& str, uint64_t p, uint64_t m) {
+    uint64_t hash_value = 0;
+    uint64_t p_pow = 1;
+
+    for (char c : str) {
+        hash_value = (hash_value + (c - 'a' + 1) * p_pow) % m;
+        p_pow = (p_pow * p) % m;
+    }
+    return hash_value;
+}
+
+RSAMessage EncryptMessage(string message, Public_key key, uint64_t p_hash, uint64_t m_hash) {
+    vector <__int128> prime_numbers_sign = find_primes_with_bit_length(32, 10, 2, false);
+    __int128 p_sign = prime_numbers_sign[0];
+    __int128 q_sign = prime_numbers_sign[1];
+    __int128 n_sign = p_sign * q_sign;
+    __int128 lambda_n = lcm_method(p_sign-1 , q_sign-1);
+    __int128 e_sign = get_coprime(lambda_n);
+    __int128 d_sign = extendedEuclidean(e_sign, lambda_n);
+
+    uint64_t hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
+    uint64_t sign = mod_pow(hashed_message, d_sign, n_sign);
+
+    Public_key sign_key (e_sign, n_sign);
     vector <__int128> encodedMessage = getEncodedMessage(message);
     vector <__int128> encryptedMessage;
-    __int128 p, q, e, c;
-
-    vector <__int128> prime_numbers = find_primes_with_bit_length(16, 10, 2, false);
-    p = prime_numbers[0];
-    q = prime_numbers[1];
-    __int128 n = p * q;
-    __int128 lambda_n = lcm_method(p-1 , q-1);
-    e = get_coprime(lambda_n);
+    __int128 c;
 
     for (int encodedSymbol : encodedMessage) {
-        c = mod_pow(encodedSymbol, e, n);
+        c = mod_pow(encodedSymbol, key.e, key.n);
         encryptedMessage.push_back(c);
     }
 
-    Public_key key (e, p, q);
-    RSAMessage rsaMessage(encryptedMessage, key);
+    RSAMessage rsaMessage(encryptedMessage, sign, key, sign_key);
     return rsaMessage;
 }
 
-string DecryptMessage(RSAMessage rsaMessage) {
+string DecryptMessage(RSAMessage rsaMessage, __int128 p, __int128 q, __int128 lambda_n, uint64_t p_hash, uint64_t m_hash) {
     __int128 d, m_decr;
-    __int128 lambda_n = lcm_method(rsaMessage.public_key.p-1 , rsaMessage.public_key.q-1);
     d = extendedEuclidean(rsaMessage.public_key.e, lambda_n);
     vector <__int128> decryptedEncodedMessage;
 
     for (int encodedSymbol : rsaMessage.m) {
-        m_decr = chineseRemainderDecrypt(encodedSymbol, d, rsaMessage.public_key.p, rsaMessage.public_key.q);
+        m_decr = chineseRemainderDecrypt(encodedSymbol, d, p, q);
         decryptedEncodedMessage.push_back(m_decr);
     }
 
     string message;
     message = getDecodedMessage(decryptedEncodedMessage);
+    uint64_t hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
+
+
+    uint64_t m = mod_pow(rsaMessage.sign, rsaMessage.public_sign_key.e, rsaMessage.public_sign_key.n);
+    if(hashed_message != m) {
+        cout << "Error verifying." << endl;
+    }
     return message;
 }
 
@@ -152,9 +176,21 @@ void lab2() {
     string s = "RSA (Rivest Shamir Adleman) is a public-key cryptosystem, one of the oldest widely used for secure data transmission.";
 //    cout << "Write your message:";
 //    getline(cin, s);
-//    auto start = chrono::high_resolution_clock::now();
+    auto start = chrono::high_resolution_clock::now();
 
-    RSAMessage rsaMessage = EncryptMessage(s);
+    uint64_t p_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
+    uint64_t m_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
+
+    __int128 p, q, e;
+    vector <__int128> prime_numbers = find_primes_with_bit_length(16, 10, 2, false);
+    p = prime_numbers[0];
+    q = prime_numbers[1];
+    __int128 n = p * q;
+    __int128 lambda_n = lcm_method(p-1 , q-1);
+    e = get_coprime(lambda_n);
+
+    Public_key key (e, n);
+    RSAMessage rsaMessage = EncryptMessage(s, key, p_hash, m_hash);
 
     cout << "Encrypted message: ";
     for (int encodedSymbol : rsaMessage.m) {
@@ -162,13 +198,13 @@ void lab2() {
     }
     cout << endl;
 
-    string res = DecryptMessage(rsaMessage);
-//    auto end = chrono::high_resolution_clock::now();
+    string res = DecryptMessage(rsaMessage, p, q, lambda_n, p_hash, m_hash);
+    auto end = chrono::high_resolution_clock::now();
 
-    cout << "Your decrypted message: " << res;
+    cout << "Your decrypted message: " << res << endl;
 
-//    chrono::duration<double, milli> duration = end - start;
-//    cout << "Time: " << duration.count() << "ms." << endl;
+    chrono::duration<double, milli> duration = end - start;
+    cout << "Time: " << duration.count() << "ms." << endl;
 }
 
 
