@@ -81,7 +81,6 @@ string print_base64_num(__int128 n) {
         char symbol;
         int r = result_n % 64;
         if (r < 26) symbol = static_cast<char>(r+65);
-//            symbol = '0' + r;
         else if (r >= 26 and r < 52) {
             symbol = static_cast<char>(r+71);
         }

@@ -97,7 +97,7 @@ std::pair<__int128, __int128> lucasRecurrence(__int128 P, __int128 Q, __int128 D
         }
     }
 
-    return std::make_pair(U, V);
+    return make_pair(U, V);
 }
 
 bool isStrongLucasProbablePrime(__int128 n) {
@@ -161,5 +161,6 @@ void lab1() {
     int iterations = 10;
     int quantity = 3;
 
+    cout << isStrongFermatProbablePrime(561);
     find_primes_with_bit_length(bit_length, iterations, quantity, true);
 }

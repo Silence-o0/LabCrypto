@@ -70,33 +70,6 @@ __int128 extendedEuclidean(__int128 a, __int128 b) {
     return x0;
 }
 
-void testEncryptDecrypt(__int128 m) {
-    __int128 p, q, e, d, c, m_decr;
-
-    cout << "m: "; print(m); cout << endl;
-    vector <__int128> prime_numbers = find_primes_with_bit_length(16, 10, 2, false);
-    p = prime_numbers[0];
-    q = prime_numbers[1];
-    __int128 n = p * q;
-    cout << "n: "; print(n); cout << endl;
-    cout << "p: "; print(p); cout << endl;
-    cout << "q: "; print(q); cout << endl;
-
-    __int128 lambda_n = lcm_method(p-1 , q-1);
-    cout << "lambda_n: "; print(lambda_n); cout << endl;
-
-    e = get_coprime(lambda_n);
-    cout << "e: "; print(e); cout << endl;
-    d = extendedEuclidean(e, lambda_n);
-    cout << "d: "; print(d); cout << endl;
-
-    c = mod_pow(m, e, n);
-    cout << "Encrypted: "; print(c); cout << endl;
-
-    m_decr = chineseRemainderDecrypt(c, d, p, q);
-    cout << "Decrypted: "; print(m_decr); cout << endl;
-}
-
 vector <__int128> getEncodedMessage(string message) {
     vector <__int128> vector_message;
     for (char c : message) {
@@ -113,9 +86,9 @@ string getDecodedMessage(vector <__int128> encodedMessage) {
     return message;
 }
 
-uint64_t polynomial_rolling_hash(const std::string& str, uint64_t p, uint64_t m) {
-    uint64_t hash_value = 0;
-    uint64_t p_pow = 1;
+__int128 polynomial_rolling_hash(const string& str, __int128 p, __int128 m) {
+    __int128 hash_value = 0;
+    __int128 p_pow = 1;
 
     for (char c : str) {
         hash_value = (hash_value + (c - 'a' + 1) * p_pow) % m;
@@ -124,7 +97,7 @@ uint64_t polynomial_rolling_hash(const std::string& str, uint64_t p, uint64_t m)
     return hash_value;
 }
 
-RSAMessage EncryptMessage(string message, Public_key key, uint64_t p_hash, uint64_t m_hash) {
+RSAMessage EncryptMessage(string message, Public_key key, __int128 p_hash, __int128 m_hash) {
     vector <__int128> prime_numbers_sign = find_primes_with_bit_length(32, 10, 2, false);
     __int128 p_sign = prime_numbers_sign[0];
     __int128 q_sign = prime_numbers_sign[1];
@@ -133,15 +106,15 @@ RSAMessage EncryptMessage(string message, Public_key key, uint64_t p_hash, uint6
     __int128 e_sign = get_coprime(lambda_n);
     __int128 d_sign = extendedEuclidean(e_sign, lambda_n);
 
-    uint64_t hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
-    uint64_t sign = mod_pow(hashed_message, d_sign, n_sign);
+    __int128 hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
+    __int128 sign = mod_pow(hashed_message, d_sign, n_sign);
 
     Public_key sign_key (e_sign, n_sign);
     vector <__int128> encodedMessage = getEncodedMessage(message);
     vector <__int128> encryptedMessage;
     __int128 c;
 
-    for (int encodedSymbol : encodedMessage) {
+    for (__int128 encodedSymbol : encodedMessage) {
         c = mod_pow(encodedSymbol, key.e, key.n);
         encryptedMessage.push_back(c);
     }
@@ -150,24 +123,28 @@ RSAMessage EncryptMessage(string message, Public_key key, uint64_t p_hash, uint6
     return rsaMessage;
 }
 
-string DecryptMessage(RSAMessage rsaMessage, __int128 p, __int128 q, __int128 lambda_n, uint64_t p_hash, uint64_t m_hash) {
+string DecryptMessage(RSAMessage rsaMessage, __int128 p, __int128 q, __int128 lambda_n, __int128 p_hash, __int128 m_hash) {
     __int128 d, m_decr;
     d = extendedEuclidean(rsaMessage.public_key.e, lambda_n);
     vector <__int128> decryptedEncodedMessage;
 
-    for (int encodedSymbol : rsaMessage.m) {
+    for (__int128 encodedSymbol : rsaMessage.m) {
         m_decr = chineseRemainderDecrypt(encodedSymbol, d, p, q);
         decryptedEncodedMessage.push_back(m_decr);
     }
 
     string message;
     message = getDecodedMessage(decryptedEncodedMessage);
-    uint64_t hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
+//    message = "Hello world";
+    __int128 hashed_message = polynomial_rolling_hash(message, p_hash, m_hash);
 
 
-    uint64_t m = mod_pow(rsaMessage.sign, rsaMessage.public_sign_key.e, rsaMessage.public_sign_key.n);
+    __int128 m = mod_pow(rsaMessage.sign, rsaMessage.public_sign_key.e, rsaMessage.public_sign_key.n);
     if(hashed_message != m) {
         cout << "Error verifying." << endl;
+    }
+    else {
+        cout << "Message is correct." << endl;
     }
     return message;
 }
@@ -178,8 +155,8 @@ void lab2() {
 //    getline(cin, s);
     auto start = chrono::high_resolution_clock::now();
 
-    uint64_t p_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
-    uint64_t m_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
+    __int128 p_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
+    __int128 m_hash = find_primes_with_bit_length(16, 10, 1, false)[0];
 
     __int128 p, q, e;
     vector <__int128> prime_numbers = find_primes_with_bit_length(16, 10, 2, false);
@@ -193,8 +170,9 @@ void lab2() {
     RSAMessage rsaMessage = EncryptMessage(s, key, p_hash, m_hash);
 
     cout << "Encrypted message: ";
-    for (int encodedSymbol : rsaMessage.m) {
-        cout << encodedSymbol << ", ";
+    for (__int128 encodedSymbol : rsaMessage.m) {
+        print(encodedSymbol);
+        cout << ", ";
     }
     cout << endl;
 
